@@ -25,9 +25,24 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            PR_NUMBER=${{ github.event.pull_request.number }}
+            PORT=$((8080 + PR_NUMBER))
+            CONTAINER_NAME="autostage-pr-${PR_NUMBER}"
+
+            echo "Deploying PR #${PR_NUMBER}"
+            echo "Container: ${CONTAINER_NAME}"
+            echo "Port: ${PORT}"
+
             cd ~/Autostage_CI_CD
             git pull origin test-preview
-            docker build -t autostage-pr-1 .
-            docker rm -f autostage-pr-1 || true
-            docker run -d -p 8081:80 --name autostage-pr-1 autostage-pr-1
+
+            docker build -t ${CONTAINER_NAME} .
+
+            docker rm -f ${CONTAINER_NAME} || true
+
+            docker run -d \
+              -p ${PORT}:80 \
+              --name ${CONTAINER_NAME} \
+              ${CONTAINER_NAME}
+
             docker ps
