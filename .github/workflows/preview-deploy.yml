@@ -25,5 +25,9 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            echo "Connected to EC2 successfully!"
-            docker --version
+            cd ~/Autostage_CI_CD
+            git pull origin test-preview
+            docker build -t autostage-pr-1 .
+            docker rm -f autostage-pr-1 || true
+            docker run -d -p 8081:80 --name autostage-pr-1 autostage-pr-1
+            docker ps
