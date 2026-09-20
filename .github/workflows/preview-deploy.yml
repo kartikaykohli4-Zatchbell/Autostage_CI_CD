@@ -4,17 +4,17 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
-jobs:
-  build:
-    name: Build Docker Image
-    runs-on: ubuntu-latest
-
 permissions:
   contents: read
   issues: write
   pull-requests: write
 
-  steps:
+jobs:
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
