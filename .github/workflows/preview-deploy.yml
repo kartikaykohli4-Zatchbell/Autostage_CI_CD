@@ -34,7 +34,8 @@ jobs:
             echo "Port: ${PORT}"
 
             cd ~/Autostage_CI_CD
-            git pull origin test-preview
+            git fetch origin ${{ github.event.pull_request.head.sha }}
+            git checkout --detach ${{ github.event.pull_request.head.sha }}
 
             docker build -t ${CONTAINER_NAME} .
 
