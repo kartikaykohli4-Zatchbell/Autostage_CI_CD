@@ -1,0 +1,31 @@
+name: AutoStage Preview Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup:
+    name: Cleanup Preview Environment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Cleanup PR container on EC2
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            PR_NUMBER=${{ github.event.pull_request.number }}
+            CONTAINER_NAME="autostage-pr-${PR_NUMBER}"
+
+            echo "Cleaning up PR #${PR_NUMBER}"
+            echo "Container: ${CONTAINER_NAME}"
+
+            docker rm -f ${CONTAINER_NAME} || true
+
+            docker rmi ${CONTAINER_NAME}:latest || true
+
+            echo "Remaining containers:"
+            docker ps
