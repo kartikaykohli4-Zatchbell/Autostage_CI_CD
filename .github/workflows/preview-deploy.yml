@@ -4,6 +4,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
   build:
     name: Build Docker Image
@@ -15,3 +20,72 @@ jobs:
 
       - name: Build Docker image
         run: docker build -t autostage-app .
+
+      - name: Deploy to EC2
+        id: deploy
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          capture_stdout: true
+          script: |
+            PR_NUMBER=${{ github.event.pull_request.number }}
+            PORT=$((8080 + PR_NUMBER))
+            CONTAINER_NAME="autostage-pr-${PR_NUMBER}"
+
+            echo "Deploying PR #${PR_NUMBER}"
+            echo "Container: ${CONTAINER_NAME}"
+            echo "Port: ${PORT}"
+
+            cd ~/Autostage_CI_CD
+
+            git fetch origin ${{ github.event.pull_request.head.sha }}
+            git checkout --detach ${{ github.event.pull_request.head.sha }}
+
+            docker build -t ${CONTAINER_NAME} .
+
+            docker rm -f ${CONTAINER_NAME} || true
+
+            docker run -d \
+              -p ${PORT}:80 \
+              --name ${CONTAINER_NAME} \
+              ${CONTAINER_NAME}
+
+            EC2_IP=$(curl -s http://checkip.amazonaws.com)
+
+            echo "EC2_IP=${EC2_IP}"
+            echo "PREVIEW_URL=http://${EC2_IP}:${PORT}"
+
+            docker ps
+
+      - name: Comment Preview URL
+        uses: actions/github-script@v7
+        env:
+          DEPLOY_OUTPUT: ${{ steps.deploy.outputs.stdout }}
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const output = process.env.DEPLOY_OUTPUT;
+
+            const match = output.match(/PREVIEW_URL=(http:\/\/[^\s]+)/);
+
+            if (!match) {
+              core.setFailed("Preview URL was not found in deployment output.");
+              return;
+            }
+
+            const previewUrl = match[1];
+
+            const body = `🚀 **AutoStage Preview Ready**
+
+            Preview URL: ${previewUrl}
+
+            PR #${prNumber} preview environment is running on EC2.`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: body
+            });
